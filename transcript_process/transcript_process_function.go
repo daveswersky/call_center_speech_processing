@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"cloud.google.com/go/functions/metadata"
-	"github.com/golang/protobuf/proto"
 
 	// [START imports]
 	language "cloud.google.com/go/language/apiv1"
@@ -81,8 +80,8 @@ type TranscriptRecord struct {
 	starttime          string
 	duration           float64
 	silencesecs        float64
-	sentimentscore     float64
-	magnitude          float64
+	sentimentscore     float32
+	magnitude          float32
 	silencepercentage  int
 	speakeronespeaking float64
 	speakertwospeaking float64
@@ -123,13 +122,16 @@ func process_transcript(ctx context.Context, event GCSEvent) error {
 
 	//Build the transcript record
 	parse_transcript_from_json(jsonText, &record)
-
+	//Get the sentiment analysis
+	get_nlp_analysis(ctx, &record)
+	//get_dlp_anaysis(record)
+	
 	return nil
 }
 
 //Builds the transcript record from the transcript
 func parse_transcript_from_json(rawJson string, record *TranscriptRecord) (error, string) {
-	transcript := rawJson
+	transcript := ""
 	result := TranscriptResult{}
 	
 	err := json.Unmarshal([]byte(rawJson), &result)
@@ -183,10 +185,8 @@ func parse_transcript_from_json(rawJson string, record *TranscriptRecord) (error
 		}
 	record.duration = duration
 	record.nlcategory = "N/A"
-	ctx := context.Background()
-
-	get_nlp_analysis(ctx, record)
-	get_dlp_anaysis(record)
+	
+	
 	return nil, transcript
 }
 
@@ -200,23 +200,20 @@ func get_nlp_analysis(ctx context.Context, record *TranscriptRecord) error {
 	}
 	defer client.Close()
 
-	resp, err := client.AnalyzeEntities(ctx, &languagepb.AnalyzeEntitiesRequest{
+	r, err := client.AnalyzeSentiment(ctx, &languagepb.AnalyzeSentimentRequest{
 		Document: &languagepb.Document{
-			Source: &languagepb.Document_Content{
-				Content: record.transcript,
-			},
-			Type: languagepb.Document_PLAIN_TEXT,
+				Source: &languagepb.Document_Content{
+						Content: record.transcript,
+				},
+				Type: languagepb.Document_PLAIN_TEXT,
 		},
-		EncodingType: languagepb.EncodingType_UTF8,
 	})
-
-	for _, entity := range resp.Entities {	
-		fmt.Println(entity.Name, entity.Type, entity.Salience, entity.Mentions)
-	}
-	
-	if err != nil {	
+	if err != nil {
 		return err
 	}
+
+	record.sentimentscore = r.DocumentSentiment.Score
+	record.magnitude = r.DocumentSentiment.Magnitude
 	
 	return nil
 }

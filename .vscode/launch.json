@@ -3,6 +3,9 @@
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
+    "go.testEnvVars":{
+        "GOOGLE_APPLICATION_CREDENTIALS": "~/Downloads/saf-15-23693e6f9d80.json"
+    },
     "configurations": [
         {
             "name": "Launch Package",
@@ -11,7 +14,8 @@
             "mode": "auto",
             "program": "${workspaceFolder}/cmd",
             "env": {
-                "FUNCTION_TARGET": "HelloWorld"
+                "FUNCTION_TARGET": "HelloWorld",
+                "GOOGLE_APPLICATION_CREDENTIALS": "~/Downloads/saf-15-23693e6f9d80.json"
             }
         }
     ]
