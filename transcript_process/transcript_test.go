@@ -11,9 +11,13 @@ func TestGetTranscript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	record := TranscriptRecord{}
 
 	rawTranscript := string(jsonFile)
-	transcript := get_transcript_from_json(rawTranscript)
+	err, transcript := parse_transcript_from_json(rawTranscript, &record)
+	if err != nil {
+		t.Errorf("get_transcript_from_json: %v", err)
+	}
 
 	wants := []string{
 		"Thank you for calling",
@@ -25,4 +29,15 @@ func TestGetTranscript(t *testing.T) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	}
+
+	wordCount := 559
+	if len(record.Words) != wordCount {
+		t.Errorf("got %d, want %d", len(record.Words), wordCount)
+	}
+
+	duration := 208.930
+	if record.duration != duration {
+		t.Errorf("got %f, want %f", record.duration, duration)
+	}
+
 }
