@@ -133,7 +133,11 @@ func process_transcript(ctx context.Context, event GCSEvent) error {
 	return nil
 }
 
-func get_audio_transcript(client *speech.Client, ctx context.Context, gcsUri string) (error, *speechpb.LongRunningRecognizeResponse) {
+func get_audio_transcript(ctx context.Context, gcsUri string) (error, *speechpb.LongRunningRecognizeResponse) {
+	client, err := speech.NewClient(ctx)
+	if err != nil {
+		return err, nil
+	}
 	req :=  &speechpb.LongRunningRecognizeRequest{
 		Config: &speechpb.RecognitionConfig{
 			SampleRateHertz:                     44100,
@@ -168,15 +172,6 @@ func get_audio_transcript(client *speech.Client, ctx context.Context, gcsUri str
 //Builds the transcript record from the transcript
 func parse_transcript(transcript *TranscriptResult, record *TranscriptRecord) error {
 	transcriptText := ""
-	// result := TranscriptResult{}
-	
-	// err := json.Unmarshal([]byte(rawJson), &result)
-	// if err != nil {
-	// 	return err, transcript
-	// }
-	// for _, result := range result.Results {
-	// 	transcript += result.Alternatives[0].Transcript
-	// }
 
 	for _, result := range transcript.Results {
 		transcriptText += result.Alternatives[0].Transcript

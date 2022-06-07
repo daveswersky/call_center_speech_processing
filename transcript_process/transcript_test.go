@@ -50,6 +50,19 @@ func TestGetTranscript(t *testing.T) {
 	}
 }
 
+func TestAudioTranscription(t *testing.T) {
+	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "./saf-15-23693e6f9d80.json")
+	ctx := context.Background()
+	err, resp := get_audio_transcript(ctx, "gs://saf-audio-6bc68142dfd12f49/commercial_stereo.wav")
+	if err != nil {
+		t.Errorf("get_audio_transcript: %v", err)
+	}
+
+	if resp.Results[0].Alternatives[0].Transcript != "Hello, how are you?" {
+		t.Errorf("got %s, want %s", resp.Results[0].Alternatives[0].Transcript, "Hello, how are you?")
+	}
+}
+
 func TestGetSentiment(t *testing.T) {
 	os.Setenv("GOOGLE_APPLICATION_CREDENTIALS", "./saf-15-23693e6f9d80.json")
 	record := TranscriptRecord{}
