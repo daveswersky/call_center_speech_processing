@@ -2,16 +2,19 @@ package transcript_process_function
 
 import (
 	"context"
-	"encoding/json"
+
 	"fmt"
-	"time"
 	"strconv"
 	"strings"
+	"time"
+
 	"cloud.google.com/go/functions/metadata"
 
 	// [START imports]
 	language "cloud.google.com/go/language/apiv1"
+	speech "cloud.google.com/go/speech/apiv1"
 	languagepb "google.golang.org/genproto/googleapis/cloud/language/v1"
+	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 	// [END imports]
 )
 
@@ -111,6 +114,7 @@ func process_transcript(ctx context.Context, event GCSEvent) error {
 	//Read the metadata from the event
 	meta, err := metadata.FromContext(ctx)
 	record := TranscriptRecord{}
+	result := TranscriptResult{}
 
 	if err != nil {
 		return fmt.Errorf("metadata.FromContext: %v", err)
@@ -118,10 +122,10 @@ func process_transcript(ctx context.Context, event GCSEvent) error {
 	fmt.Printf("Cloud Function triggered by change to: %v\n", meta.EventID)
 
 	//Submit audio file to Google Speech API
-	jsonText := ""
+	//result = nil
 
 	//Build the transcript record
-	parse_transcript_from_json(jsonText, &record)
+	parse_transcript(&result, &record)
 	//Get the sentiment analysis
 	get_nlp_analysis(ctx, &record)
 	//get_dlp_anaysis(record)
@@ -129,32 +133,68 @@ func process_transcript(ctx context.Context, event GCSEvent) error {
 	return nil
 }
 
-//Builds the transcript record from the transcript
-func parse_transcript_from_json(rawJson string, record *TranscriptRecord) (error, string) {
-	transcript := ""
-	result := TranscriptResult{}
-	
-	err := json.Unmarshal([]byte(rawJson), &result)
-	if err != nil {
-		return err, transcript
+func get_audio_transcript(client *speech.Client, ctx context.Context, gcsUri string) (error, *speechpb.LongRunningRecognizeResponse) {
+	req :=  &speechpb.LongRunningRecognizeRequest{
+		Config: &speechpb.RecognitionConfig{
+			SampleRateHertz:                     44100,
+			LanguageCode:                        "en-US",
+			Encoding:                            speechpb.RecognitionConfig_LINEAR16,
+			AudioChannelCount:                   2,
+			EnableSeparateRecognitionPerChannel: true,
+			MaxAlternatives:                     0,
+			EnableAutomaticPunctuation:          true,
+			EnableWordTimeOffsets:               true,
+			EnableWordConfidence:                true,
+			UseEnhanced:                         true,
+			Model:                               "phone_call",
+		},
+		Audio: &speechpb.RecognitionAudio{
+			AudioSource: &speechpb.RecognitionAudio_Uri{Uri: gcsUri},
+		},
 	}
-	for _, result := range result.Results {
-		transcript += result.Alternatives[0].Transcript
+
+	op, err := client.LongRunningRecognize(ctx, req)
+
+	if err != nil {
+		return err, nil 
+	}
+	resp, err := op.Wait(ctx)
+	if err != nil {
+		return err, nil
+	}
+	return nil, resp
+}
+
+//Builds the transcript record from the transcript
+func parse_transcript(transcript *TranscriptResult, record *TranscriptRecord) error {
+	transcriptText := ""
+	// result := TranscriptResult{}
+	
+	// err := json.Unmarshal([]byte(rawJson), &result)
+	// if err != nil {
+	// 	return err, transcript
+	// }
+	// for _, result := range result.Results {
+	// 	transcript += result.Alternatives[0].Transcript
+	// }
+
+	for _, result := range transcript.Results {
+		transcriptText += result.Alternatives[0].Transcript
 	}
 
 	//Build the transcript record
-	record.transcript = transcript
+	record.transcript = transcriptText
 
-	for _, result := range result.Results {
+	for _, result := range transcript.Results {
 		for _, word := range result.Alternatives[0].Words {
 			//Parse the Word start and end times
 			start, err := strconv.ParseFloat(strings.ReplaceAll(word.StartTime, "s",""), 64)
 				if err != nil {
-					return err, transcript
+					return err
 				}
 			end, err := strconv.ParseFloat(strings.ReplaceAll(word.EndTime, "s",""), 64)
 				if err != nil {
-					return err, transcript
+					return err
 				}
 			//Incremenent the speaker durations
 			if result.ChannelTag == 1 {
@@ -179,15 +219,15 @@ func parse_transcript_from_json(rawJson string, record *TranscriptRecord) (error
 	}
 
 	//Get duration by adding the first start time to the last end time
-	duration, err := strconv.ParseFloat(strings.ReplaceAll(result.Results[len(result.Results)-1].ResultEndTime, "s",""), 64)
+	duration, err := strconv.ParseFloat(strings.ReplaceAll(transcript.Results[len(transcript.Results)-1].ResultEndTime, "s",""), 64)
 		if err != nil {	
-			return err, transcript
+			return err
 		}
 	record.duration = duration
+	record.silencesecs = duration - record.speakeronespeaking - record.speakertwospeaking
+	record.silencepercentage = int(record.silencesecs / duration * 100)
 	record.nlcategory = "N/A"
-	
-	
-	return nil, transcript
+	return nil
 }
 
 //Get sentiment analysis from the Google Cloud Natural Language API

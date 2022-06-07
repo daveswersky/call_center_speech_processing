@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"testing"
+	"encoding/json"
 )
 
 func TestGetTranscript(t *testing.T) {
@@ -15,9 +16,13 @@ func TestGetTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	record := TranscriptRecord{}
+	result := TranscriptResult{}
+	err = json.Unmarshal([]byte(jsonFile), &result)
+	if err != nil {
+		t.Errorf("get_transcript_from_json: %v", err)
+	}
 
-	rawTranscript := string(jsonFile)
-	err, transcript := parse_transcript_from_json(rawTranscript, &record)
+	err = parse_transcript(&result, &record)
 	if err != nil {
 		t.Errorf("get_transcript_from_json: %v", err)
 	}
@@ -29,7 +34,7 @@ func TestGetTranscript(t *testing.T) {
 	}
 
 	for _, want := range wants {
-		if got := transcript; !strings.Contains(got, want) {
+		if got := record.transcript; !strings.Contains(got, want) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	}
