@@ -5,7 +5,7 @@ import (
 	"os"
 
 	// Blank-import the function package so the init() runs
-	_ "example.com/hello"
+	_ "speech_analysis"
 	"github.com/GoogleCloudPlatform/functions-framework-go/funcframework"
 )
 

@@ -1,4 +1,4 @@
-package transcript_process_function
+package function
 
 import (
 	"context"

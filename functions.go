@@ -9,6 +9,7 @@ import (
 
 func init() {
 	functions.HTTP("HelloWorld", helloWorld)
+	functions.CloudEvent("AudioProcess", process_transcript)
 }
 
 // helloWorld writes "Hello, World!" to the HTTP response.

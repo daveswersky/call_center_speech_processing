@@ -1,4 +1,4 @@
-module example.com/hello
+module speech_analysis
 
 go 1.17
 
@@ -10,6 +10,7 @@ require (
 	github.com/GoogleCloudPlatform/functions-framework-go v1.5.3
 	github.com/kjk/betterguid v0.0.0-20170621091430-c442874ba63a
 	google.golang.org/genproto v0.0.0-20220518221133-4f43b3371335
+	google.golang.org/protobuf v1.28.0
 )
 
 require (
@@ -36,5 +37,4 @@ require (
 	google.golang.org/api v0.80.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/grpc v1.46.2 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
 )

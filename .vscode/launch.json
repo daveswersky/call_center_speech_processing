@@ -15,7 +15,9 @@
             "program": "${workspaceFolder}/cmd",
             "env": {
                 "FUNCTION_TARGET": "HelloWorld",
-                "GOOGLE_APPLICATION_CREDENTIALS": "~/Downloads/saf-15-23693e6f9d80.json"
+                "GOOGLE_CLOUD_PROJECT": "saf-v2",
+                "GOOGLE_DATASET_ID": "saf",
+                "GOOGLE_TABLE_ID": "transcripts"
             }
         }
     ]
