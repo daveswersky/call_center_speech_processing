@@ -2,15 +2,15 @@ package transcript_process_function
 
 import (
 	"context"
-
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"cloud.google.com/go/functions/metadata"
+	"github.com/kjk/betterguid"
 
 	// [START imports]
+	"cloud.google.com/go/bigquery"
 	language "cloud.google.com/go/language/apiv1"
 	speech "cloud.google.com/go/speech/apiv1"
 	languagepb "google.golang.org/genproto/googleapis/cloud/language/v1"
@@ -72,60 +72,63 @@ type TranscriptResult struct {
 }
 
 type TranscriptRecord struct {
-	fileid             string
-	filename           string
-	dlp                string
-	callid             string
-	date               time.Time
-	year               int
-	month              int
-	day                int
-	starttime          string
-	duration           float64
-	silencesecs        float64
-	sentimentscore     float32
-	magnitude          float32
-	silencepercentage  int
-	speakeronespeaking float64
-	speakertwospeaking float64
-	nlcategory         string
-	transcript         string
+	Fileid             string `json:"fileid"`
+	Filename           string `json:"filename"`
+	Dlp                string `json:"dlp"`
+	Callid             string `json:"callid"`
+	Date               time.Time `json:"date"`
+	Year               int `json:"year"`
+	Month              int `json:"month"`
+	Day                int `json:"day"`
+	Starttime          string `json:"starttime"`
+	Duration           float64 `json:"duration"`
+	Silencesecs        float64 `json:"silencesecs"`
+	Sentimentscore     float32 `json:"sentimentscore"`
+	Magnitude          float32 `json:"magnitude"`
+	Silencepercentage  int `json:"silencepercentage"`
+	Speakeronespeaking float64 `json:"speakeronespeaking"`
+	Speakertwospeaking float64 `json:"speakertwospeaking"`
+	Nlcategory         string `json:"nlcategory"`
+	Transcript         string `json:"transcript"`
 	Words              []struct {
 		Word       string  `json:"word"`
-		StartSecs  string  `json:"startSecs"`
-		EndSecs    string  `json:"endSecs"`
+		StartSecs  float64  `json:"startSecs"`
+		EndSecs    float64  `json:"endSecs"`
 		SpeakerTag int     `json:"speakertag"`
 		Confidence float64 `json:"confidence"`
 	} `json:"words"`
 	Entities []struct {
 		Name      string  `json:"name"`
 		Type      string  `json:"type"`
-		Sentiment float64 `json:"sentiment"`
+		Sentiment float32 `json:"sentiment"`
 	} `json:"entities"`
 	Sentences []struct {
 		Sentence  string  `json:"sentence"`
 		Sentiment float64 `json:"sentiment"`
 		Magnitude float64 `json:"magnitude"`
 	} `json:"sentences"`
-}
+} 
 
 //Triggered by Create/Finalize in the audio upload bucket
 func process_transcript(ctx context.Context, event GCSEvent) error {
 	//Read the metadata from the event
 	meta, err := metadata.FromContext(ctx)
 	record := TranscriptRecord{}
-	result := TranscriptResult{}
-
+	file := event
+	record.Fileid = betterguid.New()
 	if err != nil {
 		return fmt.Errorf("metadata.FromContext: %v", err)
 	}
 	fmt.Printf("Cloud Function triggered by change to: %v\n", meta.EventID)
 
 	//Submit audio file to Google Speech API
-	//result = nil
+	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name))
+	if err != nil {
+		return err
+	}
 
 	//Build the transcript record
-	parse_transcript(&result, &record)
+	parse_transcript(result, &record)
 	//Get the sentiment analysis
 	get_nlp_analysis(ctx, &record)
 	//get_dlp_anaysis(record)
@@ -170,7 +173,7 @@ func get_audio_transcript(ctx context.Context, gcsUri string) (error, *speechpb.
 }
 
 //Builds the transcript record from the transcript
-func parse_transcript(transcript *TranscriptResult, record *TranscriptRecord) error {
+func parse_transcript(transcript *speechpb.LongRunningRecognizeResponse, record *TranscriptRecord) error {
 	transcriptText := ""
 
 	for _, result := range transcript.Results {
@@ -178,50 +181,49 @@ func parse_transcript(transcript *TranscriptResult, record *TranscriptRecord) er
 	}
 
 	//Build the transcript record
-	record.transcript = transcriptText
+	record.Transcript = transcriptText
 
 	for _, result := range transcript.Results {
 		for _, word := range result.Alternatives[0].Words {
 			//Parse the Word start and end times
-			start, err := strconv.ParseFloat(strings.ReplaceAll(word.StartTime, "s",""), 64)
-				if err != nil {
-					return err
-				}
-			end, err := strconv.ParseFloat(strings.ReplaceAll(word.EndTime, "s",""), 64)
-				if err != nil {
-					return err
-				}
+			start, err := strconv.ParseFloat(word.StartTime.String(), 64)
+			if err != nil {
+				return err
+			}
+			end, err := strconv.ParseFloat(word.EndTime.String(), 64)
+			if err != nil {
+				return err
+			}
+			
 			//Incremenent the speaker durations
 			if result.ChannelTag == 1 {
-				record.speakeronespeaking += end - start
+				record.Speakeronespeaking += float64(end) - float64(start)
 			} else {
-				record.speakertwospeaking += end - start
+				record.Speakertwospeaking += float64(end) - float64(start)
 			}
 			record.Words = append(record.Words, struct {
 				Word       string  `json:"word"`
-				StartSecs  string  `json:"startSecs"`
-				EndSecs    string  `json:"endSecs"`
+				StartSecs  float64  `json:"startSecs"`
+				EndSecs    float64  `json:"endSecs"`
 				SpeakerTag int     `json:"speakertag"`
 				Confidence float64 `json:"confidence"`
 			}{
 				Word:       word.Word,
-				StartSecs:  word.StartTime,
-				EndSecs:    word.EndTime,
-				SpeakerTag: result.ChannelTag,
-				Confidence: word.Confidence,
+				StartSecs:  start,
+				EndSecs:    end,
+				SpeakerTag: int(result.ChannelTag),
+				Confidence: float64(word.Confidence),
 			})
 		}
 	}
 
 	//Get duration by adding the first start time to the last end time
-	duration, err := strconv.ParseFloat(strings.ReplaceAll(transcript.Results[len(transcript.Results)-1].ResultEndTime, "s",""), 64)
-		if err != nil {	
-			return err
-		}
-	record.duration = duration
-	record.silencesecs = duration - record.speakeronespeaking - record.speakertwospeaking
-	record.silencepercentage = int(record.silencesecs / duration * 100)
-	record.nlcategory = "N/A"
+	duration := transcript.Results[len(transcript.Results)-1].ResultEndTime.Seconds //strconv.ParseFloat(strings.ReplaceAll(transcript.Results[len(transcript.Results)-1].ResultEndTime.String(), "s",""), 64)
+		
+	record.Duration = float64(duration)
+	record.Silencesecs = float64(duration) - record.Speakeronespeaking - record.Speakertwospeaking
+	record.Silencepercentage = int(record.Silencesecs / float64(duration) * 100)
+	record.Nlcategory = "N/A"
 	return nil
 }
 
@@ -238,7 +240,7 @@ func get_nlp_analysis(ctx context.Context, record *TranscriptRecord) error {
 	r, err := client.AnalyzeSentiment(ctx, &languagepb.AnalyzeSentimentRequest{
 		Document: &languagepb.Document{
 				Source: &languagepb.Document_Content{
-						Content: record.transcript,
+						Content: record.Transcript,
 				},
 				Type: languagepb.Document_PLAIN_TEXT,
 		},
@@ -247,13 +249,52 @@ func get_nlp_analysis(ctx context.Context, record *TranscriptRecord) error {
 		return err
 	}
 
-	record.sentimentscore = r.DocumentSentiment.Score
-	record.magnitude = r.DocumentSentiment.Magnitude
-	
+	record.Sentimentscore = r.DocumentSentiment.Score
+	record.Magnitude = r.DocumentSentiment.Magnitude
+
+	//Get the entity analysis
+	entitySentiment, err := client.AnalyzeEntitySentiment(ctx, &languagepb.AnalyzeEntitySentimentRequest{
+		Document: &languagepb.Document{
+				Source: &languagepb.Document_Content{
+						Content: record.Transcript,
+				},
+				Type: languagepb.Document_PLAIN_TEXT,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	for _, entity := range entitySentiment.Entities {
+		record.Entities = append(record.Entities, struct {
+			Name       string  `json:"name"`
+			Type       string  `json:"type"`
+			Sentiment  float32  `json:"sentiment"`
+		}{
+			Name:       entity.Name,
+			Type:       entity.Type.String(),
+			Sentiment:  entity.Sentiment.Score,
+		})
+	}		
 	return nil
 }
 
 func get_dlp_anaysis(record *TranscriptRecord) error {
+
+	return nil
+}
+
+func commit_transcript_record(ctx context.Context, projectID, datasetID, tableID string, record *TranscriptRecord) error {
+	//Commit the transcript record to the database
+	client, err := bigquery.NewClient(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	inserter := client.Dataset(datasetID).Table(tableID).Inserter()
+	items := record
+	if err := inserter.Put(ctx, items); err != nil {
+		return err
+	}
 
 	return nil
 }
