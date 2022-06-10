@@ -3,8 +3,8 @@ package transcript_process_function
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
+	"os"
 
 	"cloud.google.com/go/functions/metadata"
 	"github.com/kjk/betterguid"
@@ -15,6 +15,7 @@ import (
 	speech "cloud.google.com/go/speech/apiv1"
 	languagepb "google.golang.org/genproto/googleapis/cloud/language/v1"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
+	"google.golang.org/protobuf/types/known/durationpb"
 	// [END imports]
 )
 
@@ -104,8 +105,8 @@ type TranscriptRecord struct {
 	} `json:"entities"`
 	Sentences []struct {
 		Sentence  string  `json:"sentence"`
-		Sentiment float64 `json:"sentiment"`
-		Magnitude float64 `json:"magnitude"`
+		Sentiment float32 `json:"sentiment"`
+		Magnitude float32 `json:"magnitude"`
 	} `json:"sentences"`
 } 
 
@@ -132,7 +133,7 @@ func process_transcript(ctx context.Context, event GCSEvent) error {
 	//Get the sentiment analysis
 	get_nlp_analysis(ctx, &record)
 	//get_dlp_anaysis(record)
-	
+	commit_transcript_record(ctx, &record)
 	return nil
 }
 
@@ -172,6 +173,10 @@ func get_audio_transcript(ctx context.Context, gcsUri string) (error, *speechpb.
 	return nil, resp
 }
 
+func get_seconds_from_duration(duration *durationpb.Duration) float64 {
+	return float64(duration.Seconds) + float64(duration.Nanos) / 1e8
+}
+
 //Builds the transcript record from the transcript
 func parse_transcript(transcript *speechpb.LongRunningRecognizeResponse, record *TranscriptRecord) error {
 	transcriptText := ""
@@ -185,21 +190,14 @@ func parse_transcript(transcript *speechpb.LongRunningRecognizeResponse, record 
 
 	for _, result := range transcript.Results {
 		for _, word := range result.Alternatives[0].Words {
-			//Parse the Word start and end times
-			start, err := strconv.ParseFloat(word.StartTime.String(), 64)
-			if err != nil {
-				return err
-			}
-			end, err := strconv.ParseFloat(word.EndTime.String(), 64)
-			if err != nil {
-				return err
-			}
+			start := get_seconds_from_duration(word.StartTime)
+			end := get_seconds_from_duration(word.EndTime)
 			
 			//Incremenent the speaker durations
 			if result.ChannelTag == 1 {
-				record.Speakeronespeaking += float64(end) - float64(start)
+				record.Speakeronespeaking += end - start
 			} else {
-				record.Speakertwospeaking += float64(end) - float64(start)
+				record.Speakertwospeaking += end - start
 			}
 			record.Words = append(record.Words, struct {
 				Word       string  `json:"word"`
@@ -218,7 +216,7 @@ func parse_transcript(transcript *speechpb.LongRunningRecognizeResponse, record 
 	}
 
 	//Get duration by adding the first start time to the last end time
-	duration := transcript.Results[len(transcript.Results)-1].ResultEndTime.Seconds //strconv.ParseFloat(strings.ReplaceAll(transcript.Results[len(transcript.Results)-1].ResultEndTime.String(), "s",""), 64)
+	duration := get_seconds_from_duration(transcript.Results[len(transcript.Results)-1].ResultEndTime) //strconv.ParseFloat(strings.ReplaceAll(transcript.Results[len(transcript.Results)-1].ResultEndTime.String(), "s",""), 64)
 		
 	record.Duration = float64(duration)
 	record.Silencesecs = float64(duration) - record.Speakeronespeaking - record.Speakertwospeaking
@@ -251,7 +249,17 @@ func get_nlp_analysis(ctx context.Context, record *TranscriptRecord) error {
 
 	record.Sentimentscore = r.DocumentSentiment.Score
 	record.Magnitude = r.DocumentSentiment.Magnitude
-
+	for _, entity := range r.Sentences {
+		record.Sentences = append(record.Sentences, struct {
+			Sentence string `json:"sentence"`
+			Sentiment float32 `json:"sentiment"`
+			Magnitude float32 `json:"magnitude"`
+		}{
+			Sentence: entity.Text.Content,
+			Sentiment: entity.Sentiment.Score,
+			Magnitude: entity.Sentiment.Magnitude,
+		})
+	}
 	//Get the entity analysis
 	entitySentiment, err := client.AnalyzeEntitySentiment(ctx, &languagepb.AnalyzeEntitySentimentRequest{
 		Document: &languagepb.Document{
@@ -283,7 +291,19 @@ func get_dlp_anaysis(record *TranscriptRecord) error {
 	return nil
 }
 
-func commit_transcript_record(ctx context.Context, projectID, datasetID, tableID string, record *TranscriptRecord) error {
+func commit_transcript_record(ctx context.Context, record *TranscriptRecord) error {
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	if projectID == "" {
+		return fmt.Errorf("GOOGLE_CLOUD_PROJECT environment variable not set")
+	}
+	datasetID := os.Getenv("GOOGLE_DATASET_ID")
+	if datasetID == "" {
+		return fmt.Errorf("GOOGLE_DATASET_ID environment variable not set")
+	}
+	tableID := os.Getenv("GOOGLE_TABLE_ID")
+	if tableID == "" {
+		return fmt.Errorf("GOOGLE_TABLE_ID environment variable not set")
+	}
 	//Commit the transcript record to the database
 	client, err := bigquery.NewClient(ctx, projectID)
 	if err != nil {
@@ -295,6 +315,5 @@ func commit_transcript_record(ctx context.Context, projectID, datasetID, tableID
 	if err := inserter.Put(ctx, items); err != nil {
 		return err
 	}
-
 	return nil
 }

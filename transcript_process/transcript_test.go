@@ -2,11 +2,12 @@ package transcript_process_function
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"os"
 	"strings"
 	"testing"
-	"encoding/json"
 
 	// [START imports]
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
@@ -46,7 +47,7 @@ func TestGetTranscript(t *testing.T) {
 		t.Errorf("got %d, want %d", len(record.Words), wordCount)
 	}
 
-	duration := 108.0
+	duration := 111.1
 	if record.Duration != duration {
 		t.Errorf("got %f, want %f", record.Duration, duration)
 	}
@@ -80,6 +81,9 @@ func TestGetSentiment(t *testing.T) {
 }
 
 func TestCommitBQ(t *testing.T) {
+	os.Setenv("GOOGLE_CLOUD_PROJECT", "saf-v2")
+	os.Setenv("GOOGLE_DATASET_ID", "saf")
+	os.Setenv("GOOGLE_TABLE_ID", "transcripts")
 	ctx := context.Background()
 	transcript := TranscriptRecord{}
 	transcript.Fileid = "test"
@@ -99,8 +103,26 @@ func TestCommitBQ(t *testing.T) {
 		SpeakerTag: 1,
 		Confidence: 0.9,
 	})
+	transcript.Entities = append(transcript.Entities, struct {
+		Name string `json:"name"`
+		Type string `json:"type"`
+		Sentiment float32 `json:"sentiment"`
+	}{
+		Name 	 : "I",
+		Type 	 : "PERSON",
+		Sentiment : 0.9,
+	})
+	transcript.Sentences = append(transcript.Sentences, struct {
+		Sentence  string  `json:"sentence"`
+		Sentiment float32 `json:"sentiment"`
+		Magnitude float32 `json:"magnitude"`
+	}{
+		Sentence: "I am happy",
+		Sentiment: 0.9,
+		Magnitude: 0.9,
+	})
 
-	err := commit_transcript_record(ctx, "saf-v2", "saf", "transcripts", &transcript)
+	err := commit_transcript_record(ctx, &transcript)
 	if err != nil {
 		t.Errorf("commit_bq: %v", err)
 	}
