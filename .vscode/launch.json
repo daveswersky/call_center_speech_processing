@@ -14,7 +14,7 @@
             "mode": "auto",
             "program": "${workspaceFolder}/cmd",
             "env": {
-                "FUNCTION_TARGET": "HelloWorld",
+                "FUNCTION_TARGET": "AudioProcess",
                 "GOOGLE_CLOUD_PROJECT": "saf-v2",
                 "GOOGLE_DATASET_ID": "saf",
                 "GOOGLE_TABLE_ID": "transcripts"

@@ -4,7 +4,6 @@ go 1.17
 
 require (
 	cloud.google.com/go/bigquery v1.8.0
-	cloud.google.com/go/functions v1.0.0
 	cloud.google.com/go/language v1.2.0
 	cloud.google.com/go/speech v1.4.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.5.3
@@ -16,6 +15,7 @@ require (
 require (
 	cloud.google.com/go v0.101.1 // indirect
 	cloud.google.com/go/compute v1.6.1 // indirect
+	cloud.google.com/go/functions v1.0.0 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.6.1 // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/golang/protobuf v1.5.2 // indirect

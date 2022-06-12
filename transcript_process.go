@@ -6,7 +6,6 @@ import (
 	"time"
 	"os"
 
-	"cloud.google.com/go/functions/metadata"
 	"github.com/kjk/betterguid"
 
 	// [START imports]
@@ -16,44 +15,9 @@ import (
 	languagepb "google.golang.org/genproto/googleapis/cloud/language/v1"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 	"google.golang.org/protobuf/types/known/durationpb"
-	"github.com/cloudevents/sdk-go/v2/event"
 	// [END imports]
 )
 
-// GCSEvent is the payload of a GCS event.
-// type GCSEvent struct {
-// 	Kind                    string                 `json:"kind"`
-// 	ID                      string                 `json:"id"`
-// 	SelfLink                string                 `json:"selfLink"`
-// 	Name                    string                 `json:"name"`
-// 	Bucket                  string                 `json:"bucket"`
-// 	Generation              string                 `json:"generation"`
-// 	Metageneration          string                 `json:"metageneration"`
-// 	ContentType             string                 `json:"contentType"`
-// 	TimeCreated             time.Time              `json:"timeCreated"`
-// 	Updated                 time.Time              `json:"updated"`
-// 	TemporaryHold           bool                   `json:"temporaryHold"`
-// 	EventBasedHold          bool                   `json:"eventBasedHold"`
-// 	RetentionExpirationTime time.Time              `json:"retentionExpirationTime"`
-// 	StorageClass            string                 `json:"storageClass"`
-// 	TimeStorageClassUpdated time.Time              `json:"timeStorageClassUpdated"`
-// 	Size                    string                 `json:"size"`
-// 	MD5Hash                 string                 `json:"md5Hash"`
-// 	MediaLink               string                 `json:"mediaLink"`
-// 	ContentEncoding         string                 `json:"contentEncoding"`
-// 	ContentDisposition      string                 `json:"contentDisposition"`
-// 	CacheControl            string                 `json:"cacheControl"`
-// 	Metadata                map[string]interface{} `json:"metadata"`
-// 	CRC32C                  string                 `json:"crc32c"`
-// 	ComponentCount          int                    `json:"componentCount"`
-// 	Etag                    string                 `json:"etag"`
-// 	CustomerEncryption      struct {
-// 		EncryptionAlgorithm string `json:"encryptionAlgorithm"`
-// 		KeySha256           string `json:"keySha256"`
-// 	}
-// 	KMSKeyName    string `json:"kmsKeyName"`
-// 	ResourceState string `json:"resourceState"`
-// }
 
 type TranscriptResult struct {
 	Results []struct {
@@ -111,6 +75,41 @@ type TranscriptRecord struct {
 	} `json:"sentences"`
 } 
 
+// GCSEvent is the payload of a GCS event.
+type GCSEvent struct {
+	Kind                    string                 `json:"kind"`
+	ID                      string                 `json:"id"`
+	SelfLink                string                 `json:"selfLink"`
+	Name                    string                 `json:"name"`
+	Bucket                  string                 `json:"bucket"`
+	Generation              string                 `json:"generation"`
+	Metageneration          string                 `json:"metageneration"`
+	ContentType             string                 `json:"contentType"`
+	TimeCreated             time.Time              `json:"timeCreated"`
+	Updated                 time.Time              `json:"updated"`
+	TemporaryHold           bool                   `json:"temporaryHold"`
+	EventBasedHold          bool                   `json:"eventBasedHold"`
+	RetentionExpirationTime time.Time              `json:"retentionExpirationTime"`
+	StorageClass            string                 `json:"storageClass"`
+	TimeStorageClassUpdated time.Time              `json:"timeStorageClassUpdated"`
+	Size                    string                 `json:"size"`
+	MD5Hash                 string                 `json:"md5Hash"`
+	MediaLink               string                 `json:"mediaLink"`
+	ContentEncoding         string                 `json:"contentEncoding"`
+	ContentDisposition      string                 `json:"contentDisposition"`
+	CacheControl            string                 `json:"cacheControl"`
+	Metadata                map[string]interface{} `json:"metadata"`
+	CRC32C                  string                 `json:"crc32c"`
+	ComponentCount          int                    `json:"componentCount"`
+	Etag                    string                 `json:"etag"`
+	CustomerEncryption      struct {
+			EncryptionAlgorithm string `json:"encryptionAlgorithm"`
+			KeySha256           string `json:"keySha256"`
+	}
+	KMSKeyName    string `json:"kmsKeyName"`
+	ResourceState string `json:"resourceState"`
+}
+
 // StorageObjectData contains metadata of the Cloud Storage object.
 type StorageObjectData struct {
 	Bucket         string    `json:"bucket,omitempty"`
@@ -121,20 +120,12 @@ type StorageObjectData struct {
 }
 
 //Triggered by Create/Finalize in the audio upload bucket
-func process_transcript(ctx context.Context, e event.Event) error {
+func Process_transcript(ctx context.Context, e GCSEvent) error {
 	//Read the metadata from the event
-	meta, err := metadata.FromContext(ctx)
 	record := TranscriptRecord{}
-	var file StorageObjectData
-	if err := e.DataAs(&file); err != nil {
-		return fmt.Errorf("event.DataAs: %v", err)
-	}
+	file := e
 	record.Fileid = betterguid.New()
-	
-	if err != nil {
-		return fmt.Errorf("metadata.FromContext: %v", err)
-	}
-	fmt.Printf("Cloud Function triggered by change to: %v\n", meta.EventID)
+	record.Filename = fmt.Sprintf("%s/%s", file.Bucket, file.Name)
 
 	//Submit audio file to Google Speech API
 	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name))
@@ -142,11 +133,14 @@ func process_transcript(ctx context.Context, e event.Event) error {
 		return err
 	}
 
+
 	//Build the transcript record
 	parse_transcript(result, &record)
 	//Get the sentiment analysis
 	get_nlp_analysis(ctx, &record)
+	//Get the DLP analysis
 	//get_dlp_anaysis(record)
+	//Commit BQ record
 	commit_transcript_record(ctx, &record)
 	return nil
 }

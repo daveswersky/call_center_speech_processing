@@ -14,7 +14,17 @@ import (
 	// [END imports]
 )
 
-func TestGetTranscript(t *testing.T) {
+
+func TestProcessTranscript(t *testing.T) {
+	e := GCSEvent{}
+	e.Bucket = ""
+	e.Name = "test.wav"
+	e.Metageneration = "1"
+
+	Process_transcript(context.Background(), e)
+}
+
+func TestParseTranscript(t *testing.T) {
 	jsonFile, err := ioutil.ReadFile("sample_transcript.json")
 	if err != nil {
 		t.Fatal(err)
