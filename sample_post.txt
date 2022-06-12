@@ -1,0 +1,5 @@
+{"bucket":"gs://foo","name":"sample.wav"}
+
+curl -i -XPOST -H 'Content-type: application/json' -d '{"bucket":"safv2_audio_upload","name":"sample_order.wav","resourceState":"exists","metageneration":"1"}' localhost:8080
+
+go test -timeout 500s -run ^TestGetSentiment$ example.com/hello/transcript_process

@@ -15,6 +15,7 @@ import (
 	languagepb "google.golang.org/genproto/googleapis/cloud/language/v1"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"cloud.google.com/go/storage"
 	// [END imports]
 )
 
@@ -126,13 +127,18 @@ func Process_transcript(ctx context.Context, e GCSEvent) error {
 	file := e
 	record.Fileid = betterguid.New()
 	record.Filename = fmt.Sprintf("%s/%s", file.Bucket, file.Name)
+	callid, err := get_callid_from_audiofile(ctx, e.Bucket, e.Name) 
+	if err != nil { 
+		return err 
+	}
+	record.Callid = callid
+	record.Dlp = "false"
 
 	//Submit audio file to Google Speech API
 	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name))
 	if err != nil {
 		return err
 	}
-
 
 	//Build the transcript record
 	parse_transcript(result, &record)
@@ -143,6 +149,20 @@ func Process_transcript(ctx context.Context, e GCSEvent) error {
 	//Commit BQ record
 	commit_transcript_record(ctx, &record)
 	return nil
+}
+
+func get_callid_from_audiofile(ctx context.Context, bucket, filename string) (string, error) {
+	//Get the callid from the audio file
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return "Error accessing audio storage bucket to retrieve callid metadata", err
+	}
+	file := client.Bucket(bucket).Object(filename)
+	attrs, err := file.Attrs(ctx)
+	if err != nil {
+		return "Error accessing audio storage bucket to retrieve callid metadata", err
+	}
+	return attrs.Metadata["callid"], nil
 }
 
 func get_audio_transcript(ctx context.Context, gcsUri string) (error, *speechpb.LongRunningRecognizeResponse) {
@@ -295,7 +315,7 @@ func get_nlp_analysis(ctx context.Context, record *TranscriptRecord) error {
 }
 
 func get_dlp_anaysis(record *TranscriptRecord) error {
-
+	record.Dlp = "true"
 	return nil
 }
 

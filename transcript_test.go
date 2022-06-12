@@ -24,6 +24,18 @@ func TestProcessTranscript(t *testing.T) {
 	Process_transcript(context.Background(), e)
 }
 
+func TestGetCallid(t *testing.T) {
+	ctx := context.Background()
+	callid, err := get_callid_from_audiofile(ctx,"safv2_audio_upload", "sample_order.wav")
+	if err != nil {
+		t.Errorf("get_callid_from_audiofile: %v", err)
+	}
+	wants := "123456"
+	if callid != wants {
+		t.Errorf("got %s, want %s", callid, wants)
+	}	
+}
+
 func TestParseTranscript(t *testing.T) {
 	jsonFile, err := ioutil.ReadFile("sample_transcript.json")
 	if err != nil {
