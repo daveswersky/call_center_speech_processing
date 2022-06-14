@@ -4,7 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "go.testEnvVars":{
-        "GOOGLE_APPLICATION_CREDENTIALS": "~/Downloads/saf-15-23693e6f9d80.json"
+        "BUCKET_NAME": "saf-audio-6bc68142dfd12f49"
     },
     "configurations": [
         {
@@ -17,7 +17,8 @@
                 "FUNCTION_TARGET": "AudioProcess",
                 "GOOGLE_CLOUD_PROJECT": "saf-v2",
                 "GOOGLE_DATASET_ID": "saf",
-                "GOOGLE_TABLE_ID": "transcripts"
+                "GOOGLE_TABLE_ID": "transcripts",
+                
             }
         }
     ]

@@ -1,3 +1,10 @@
 {
-    "go.formatTool": "gofmt"
+    "go.formatTool": "gofmt",
+    "go.testEnvVars":{
+        "BUCKET_NAME": "safv2_audio_upload",
+        "TEST_FILE" : "commercial_stereo.wav",
+        "GOOGLE_CLOUD_PROJECT": "saf-v2",
+        "GOOGLE_DATASET_ID" : "saf",
+        "GOOGLE_TABLE_ID" : "transcripts"
+    }
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 	"os"
-
+	"log"
 	"github.com/kjk/betterguid"
 
 	// [START imports]
@@ -16,6 +16,7 @@ import (
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"cloud.google.com/go/storage"
+	"cloud.google.com/go/logging"
 	// [END imports]
 )
 
@@ -111,61 +112,60 @@ type GCSEvent struct {
 	ResourceState string `json:"resourceState"`
 }
 
-// StorageObjectData contains metadata of the Cloud Storage object.
-type StorageObjectData struct {
-	Bucket         string    `json:"bucket,omitempty"`
-	Name           string    `json:"name,omitempty"`
-	Metageneration int64     `json:"metageneration,string,omitempty"`
-	TimeCreated    time.Time `json:"timeCreated,omitempty"`
-	Updated        time.Time `json:"updated,omitempty"`
-}
 
 //Triggered by Create/Finalize in the audio upload bucket
 func Process_transcript(ctx context.Context, e GCSEvent) error {
-	//Read the metadata from the event
 	record := TranscriptRecord{}
+
+	logger, err := logging.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
+	if err != nil {
+		log.Fatalf("Failed to create logging client: %v", err)
+	}
+	//Read the metadata from the file
+	err = get_file_metadata(ctx, e.Bucket, e.Name, &record) 
+	if err != nil { 
+		log.Fatalf("Failed to get metadata from audio file: %v", err) 
+	}
+
 	file := e
 	record.Fileid = betterguid.New()
 	record.Filename = fmt.Sprintf("%s/%s", file.Bucket, file.Name)
-	callid, err := get_callid_from_audiofile(ctx, e.Bucket, e.Name) 
-	if err != nil { 
-		return err 
-	}
-	record.Callid = callid
-	record.Dlp = "false"
 
 	//Submit audio file to Google Speech API
-	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name))
+	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name), logger)
 	if err != nil {
 		return err
 	}
 
 	//Build the transcript record
-	parse_transcript(result, &record)
+	parse_transcript(result, &record, logger)
 	//Get the sentiment analysis
-	get_nlp_analysis(ctx, &record)
+	get_nlp_analysis(ctx, &record, logger)
 	//Get the DLP analysis
 	//get_dlp_anaysis(record)
 	//Commit BQ record
-	commit_transcript_record(ctx, &record)
+	commit_transcript_record(ctx, &record, logger)
 	return nil
 }
 
-func get_callid_from_audiofile(ctx context.Context, bucket, filename string) (string, error) {
-	//Get the callid from the audio file
+func get_file_metadata(ctx context.Context, bucket, filename string, record *TranscriptRecord) error {
+	//Get the metadata from the audio file
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		return "Error accessing audio storage bucket to retrieve callid metadata", err
+		return err
 	}
+	defer client.Close()
 	file := client.Bucket(bucket).Object(filename)
 	attrs, err := file.Attrs(ctx)
 	if err != nil {
-		return "Error accessing audio storage bucket to retrieve callid metadata", err
+		return err
 	}
-	return attrs.Metadata["callid"], nil
+	record.Callid = attrs.Metadata["callid"]
+	record.Dlp = attrs.Metadata["dlp"]
+	return nil
 }
 
-func get_audio_transcript(ctx context.Context, gcsUri string) (error, *speechpb.LongRunningRecognizeResponse) {
+func get_audio_transcript(ctx context.Context, gcsUri string, logger *logging.Client) (error, *speechpb.LongRunningRecognizeResponse) {
 	client, err := speech.NewClient(ctx)
 	if err != nil {
 		return err, nil
@@ -202,11 +202,11 @@ func get_audio_transcript(ctx context.Context, gcsUri string) (error, *speechpb.
 }
 
 func get_seconds_from_duration(duration *durationpb.Duration) float64 {
-	return float64(duration.Seconds) + float64(duration.Nanos) / 1e8
+	return float64(duration.Seconds) + float64(duration.Nanos) / 1e9
 }
 
 //Builds the transcript record from the transcript
-func parse_transcript(transcript *speechpb.LongRunningRecognizeResponse, record *TranscriptRecord) error {
+func parse_transcript(transcript *speechpb.LongRunningRecognizeResponse, record *TranscriptRecord, logger *logging.Client) error {
 	transcriptText := ""
 
 	for _, result := range transcript.Results {
@@ -255,7 +255,7 @@ func parse_transcript(transcript *speechpb.LongRunningRecognizeResponse, record 
 
 //Get sentiment analysis from the Google Cloud Natural Language API
 //AnalyzeSentiment and AnalayzeEntitySentiment 
-func get_nlp_analysis(ctx context.Context, record *TranscriptRecord) error {
+func get_nlp_analysis(ctx context.Context, record *TranscriptRecord, logger *logging.Client) error {
 	//Get the sentiment analysis
 	client, err := language.NewClient(ctx)
 	if err != nil {
@@ -314,12 +314,12 @@ func get_nlp_analysis(ctx context.Context, record *TranscriptRecord) error {
 	return nil
 }
 
-func get_dlp_anaysis(record *TranscriptRecord) error {
+func get_dlp_anaysis(ctx context.Context, record *TranscriptRecord, logger *logging.Client) error {
 	record.Dlp = "true"
 	return nil
 }
 
-func commit_transcript_record(ctx context.Context, record *TranscriptRecord) error {
+func commit_transcript_record(ctx context.Context, record *TranscriptRecord, logger *logging.Client) error {
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	if projectID == "" {
 		return fmt.Errorf("GOOGLE_CLOUD_PROJECT environment variable not set")

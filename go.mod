@@ -5,6 +5,7 @@ go 1.17
 require (
 	cloud.google.com/go/bigquery v1.8.0
 	cloud.google.com/go/language v1.2.0
+	cloud.google.com/go/logging v1.4.2
 	cloud.google.com/go/speech v1.4.0
 	cloud.google.com/go/storage v1.22.1
 	github.com/GoogleCloudPlatform/functions-framework-go v1.5.3
@@ -34,6 +35,7 @@ require (
 	go.uber.org/zap v1.10.0 // indirect
 	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
 	golang.org/x/oauth2 v0.0.0-20220411215720-9780585627b5 // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20220503163025-988cb79eb6c6 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
