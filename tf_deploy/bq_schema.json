@@ -1,0 +1,168 @@
+[
+    {
+        "mode": "NULLABLE", 
+        "name": "fileid", 
+        "type": "STRING"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "filename", 
+        "type": "STRING"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "dlp", 
+        "type": "STRING"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "callid", 
+        "type": "STRING"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "date", 
+        "type": "TIMESTAMP"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "year", 
+        "type": "INTEGER"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "month", 
+        "type": "INTEGER"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "day", 
+        "type": "INTEGER"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "starttime", 
+        "type": "STRING"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "duration", 
+        "type": "FLOAT"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "silencesecs", 
+        "type": "FLOAT"
+    },
+    {
+        "mode": "NULLABLE", 
+        "name": "sentimentscore", 
+        "type": "FLOAT"
+    },
+    {
+        "mode": "NULLABLE", 
+        "name": "magnitude", 
+        "type": "FLOAT"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "silencepercentage", 
+        "type": "INTEGER"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "speakeronespeaking", 
+        "type": "FLOAT"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "speakertwospeaking", 
+        "type": "FLOAT"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "nlcategory", 
+        "type": "STRING"
+    }, 
+    {
+        "mode": "NULLABLE", 
+        "name": "transcript", 
+        "type": "STRING"
+    }, 
+    {
+        "fields": [
+        {
+            "mode": "NULLABLE", 
+            "name": "name", 
+            "type": "STRING"
+        }, 
+        {
+            "mode": "NULLABLE", 
+            "name": "type", 
+            "type": "STRING"
+        }, 
+        {
+            "mode": "NULLABLE", 
+            "name": "sentiment", 
+            "type": "FLOAT"
+        }
+        ], 
+        "mode": "REPEATED", 
+        "name": "entities", 
+        "type": "RECORD"
+    }, 
+    {
+        "fields": [
+        {
+            "mode": "NULLABLE", 
+            "name": "word", 
+            "type": "STRING"
+        }, 
+        {
+            "mode": "NULLABLE", 
+            "name": "startSecs", 
+            "type": "FLOAT"
+        }, 
+        {
+            "mode": "NULLABLE", 
+            "name": "endSecs", 
+            "type": "FLOAT"
+        }, 
+        {
+            "mode": "NULLABLE", 
+            "name": "speakertag", 
+            "type": "INTEGER"
+        }, 
+        {
+            "mode": "NULLABLE", 
+            "name": "confidence", 
+            "type": "FLOAT"
+        }
+        ], 
+        "mode": "REPEATED", 
+        "name": "words", 
+        "type": "RECORD"
+    }, 
+    {
+        "fields": [
+        {
+            "mode": "NULLABLE", 
+            "name": "sentence", 
+            "type": "STRING"
+        }, 
+        {
+            "mode": "NULLABLE", 
+            "name": "sentiment", 
+            "type": "FLOAT"
+        }, 
+        {
+            "mode": "NULLABLE", 
+            "name": "magnitude", 
+            "type": "FLOAT"
+        }
+        ], 
+        "mode": "REPEATED", 
+        "name": "sentences", 
+        "type": "RECORD"
+        }
+]

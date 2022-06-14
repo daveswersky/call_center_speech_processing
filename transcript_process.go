@@ -112,11 +112,9 @@ type GCSEvent struct {
 	ResourceState string `json:"resourceState"`
 }
 
-
 //Triggered by Create/Finalize in the audio upload bucket
 func Process_transcript(ctx context.Context, e GCSEvent) error {
 	record := TranscriptRecord{}
-
 	logger, err := logging.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
 	if err != nil {
 		log.Fatalf("Failed to create logging client: %v", err)
@@ -126,17 +124,15 @@ func Process_transcript(ctx context.Context, e GCSEvent) error {
 	if err != nil { 
 		log.Fatalf("Failed to get metadata from audio file: %v", err) 
 	}
-
 	file := e
+	record.Date = time.Now()
 	record.Fileid = betterguid.New()
 	record.Filename = fmt.Sprintf("%s/%s", file.Bucket, file.Name)
-
 	//Submit audio file to Google Speech API
 	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name), logger)
 	if err != nil {
 		return err
 	}
-
 	//Build the transcript record
 	parse_transcript(result, &record, logger)
 	//Get the sentiment analysis
@@ -188,9 +184,7 @@ func get_audio_transcript(ctx context.Context, gcsUri string, logger *logging.Cl
 			AudioSource: &speechpb.RecognitionAudio_Uri{Uri: gcsUri},
 		},
 	}
-
 	op, err := client.LongRunningRecognize(ctx, req)
-
 	if err != nil {
 		return err, nil 
 	}
@@ -208,19 +202,15 @@ func get_seconds_from_duration(duration *durationpb.Duration) float64 {
 //Builds the transcript record from the transcript
 func parse_transcript(transcript *speechpb.LongRunningRecognizeResponse, record *TranscriptRecord, logger *logging.Client) error {
 	transcriptText := ""
-
 	for _, result := range transcript.Results {
 		transcriptText += result.Alternatives[0].Transcript
 	}
-
 	//Build the transcript record
 	record.Transcript = transcriptText
-
 	for _, result := range transcript.Results {
 		for _, word := range result.Alternatives[0].Words {
 			start := get_seconds_from_duration(word.StartTime)
 			end := get_seconds_from_duration(word.EndTime)
-			
 			//Incremenent the speaker durations
 			if result.ChannelTag == 1 {
 				record.Speakeronespeaking += end - start
@@ -242,10 +232,8 @@ func parse_transcript(transcript *speechpb.LongRunningRecognizeResponse, record 
 			})
 		}
 	}
-
 	//Get duration by adding the first start time to the last end time
-	duration := get_seconds_from_duration(transcript.Results[len(transcript.Results)-1].ResultEndTime) //strconv.ParseFloat(strings.ReplaceAll(transcript.Results[len(transcript.Results)-1].ResultEndTime.String(), "s",""), 64)
-		
+	duration := get_seconds_from_duration(transcript.Results[len(transcript.Results)-1].ResultEndTime)
 	record.Duration = float64(duration)
 	record.Silencesecs = float64(duration) - record.Speakeronespeaking - record.Speakertwospeaking
 	record.Silencepercentage = int(record.Silencesecs / float64(duration) * 100)
@@ -262,7 +250,6 @@ func get_nlp_analysis(ctx context.Context, record *TranscriptRecord, logger *log
 		return err
 	}
 	defer client.Close()
-
 	r, err := client.AnalyzeSentiment(ctx, &languagepb.AnalyzeSentimentRequest{
 		Document: &languagepb.Document{
 				Source: &languagepb.Document_Content{
@@ -274,7 +261,6 @@ func get_nlp_analysis(ctx context.Context, record *TranscriptRecord, logger *log
 	if err != nil {
 		return err
 	}
-
 	record.Sentimentscore = r.DocumentSentiment.Score
 	record.Magnitude = r.DocumentSentiment.Magnitude
 	for _, entity := range r.Sentences {

@@ -21,8 +21,8 @@ import (
 //Integration Test
 func TestProcessTranscript(t *testing.T) {
 	e := GCSEvent{}
-	e.Bucket = ""
-	e.Name = "test.wav"
+	e.Bucket = os.Getenv("BUCKET_NAME")
+	e.Name = os.Getenv("TEST_FILE")
 	e.Metageneration = "1"
 
 	Process_transcript(context.Background(), e)
@@ -74,7 +74,6 @@ func TestParseTranscript(t *testing.T) {
 		t.Errorf("parse_transcript: %v", err)
 	}
 
-	//fmt.Println(record.transcript)
 	wants := []string{
 		"Thank you for calling",
 	}
