@@ -17,6 +17,8 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 	"cloud.google.com/go/storage"
 	"cloud.google.com/go/logging"
+	dlp "cloud.google.com/go/dlp/apiv2"
+	dlppb "google.golang.org/genproto/googleapis/privacy/dlp/v2"
 	// [END imports]
 )
 
@@ -128,6 +130,7 @@ func Process_transcript(ctx context.Context, e GCSEvent) error {
 	record.Date = time.Now()
 	record.Fileid = betterguid.New()
 	record.Filename = fmt.Sprintf("%s/%s", file.Bucket, file.Name)
+	writeEntry(logger, logging.Info, "Processing audio for callid: "+record.Callid)
 	//Submit audio file to Google Speech API
 	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name))
 	if err != nil {
@@ -139,23 +142,29 @@ func Process_transcript(ctx context.Context, e GCSEvent) error {
 		writeEntry(logger, logging.Critical, fmt.Sprintf("Failed to parse transcript from audio file: %v", err))
 		return err
 	}
+	//Use DLP to redact sensitive data
+	if record.Dlp == "true" {
+		err = redact_transcript(ctx, &record) ; if err != nil {
+			writeEntry(logger, logging.Critical, fmt.Sprintf("Failed to get DLP analysis from audio file: %v", err))
+			return err
+		}
+	}
 	//Get the sentiment analysis
 	err = get_nlp_analysis(ctx, &record) ; if err != nil {
 		writeEntry(logger, logging.Critical, fmt.Sprintf("Failed to get sentiment analysis from audio file: %v", err))
 		return err
 	}
-	//Get the DLP analysis
-	//get_dlp_anaysis(record)
 	//Commit BQ record
 	err = commit_transcript_record(ctx, &record) ; if err != nil {
 		writeEntry(logger, logging.Critical, fmt.Sprintf("Failed to commit transcript record to BigQuery: %v", err))
 		return err
 	}
+	writeEntry(logger, logging.Info, "Completed processing transcript for callid: "+record.Callid)
 	return nil
 }
 
 func writeEntry(client *logging.Client, info logging.Severity, msg string) {
-	logger := client.Logger("transcript-processor")
+	logger := client.Logger("call-audio-processor")
 	defer logger.Flush()
 	log := logger.StandardLogger(info)
 	log.Printf(msg)
@@ -317,12 +326,58 @@ func get_nlp_analysis(ctx context.Context, record *TranscriptRecord) error {
 	return nil
 }
 
-func get_dlp_anaysis(ctx context.Context, record *TranscriptRecord, logger *logging.Client) error {
-	record.Dlp = "true"
+func redact_transcript(ctx context.Context, record *TranscriptRecord) error {
+	//Get the DLP analysis
+	client, err := dlp.NewClient(ctx)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	var infoTypes []*dlppb.InfoType
+	req := &dlppb.DeidentifyContentRequest{
+		Parent: "projects/" + os.Getenv("GOOGLE_CLOUD_PROJECT"),
+		InspectConfig: &dlppb.InspectConfig{
+			InfoTypes: infoTypes,
+		},
+		DeidentifyConfig: &dlppb.DeidentifyConfig{
+			Transformation: &dlppb.DeidentifyConfig_InfoTypeTransformations{
+				InfoTypeTransformations: &dlppb.InfoTypeTransformations{
+					Transformations: []*dlppb.InfoTypeTransformations_InfoTypeTransformation{
+						{
+							InfoTypes: []*dlppb.InfoType{}, // Match all info types.
+							PrimitiveTransformation: &dlppb.PrimitiveTransformation{
+								Transformation: &dlppb.PrimitiveTransformation_CharacterMaskConfig{
+									CharacterMaskConfig: &dlppb.CharacterMaskConfig{
+										MaskingCharacter: "*",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Item : &dlppb.ContentItem{
+			DataItem: &dlppb.ContentItem_Value{
+				Value: record.Transcript,
+			},
+		},
+	}
+	//Redact the combined transcript
+	dlpResponse, err := client.DeidentifyContent(ctx, req) ; if err != nil {
+		return err
+	}
+	record.Transcript = dlpResponse.GetItem().GetValue()
+	//Redact the individual sentences
+
+	//Redact the individual words
+
+	//Redact the individual entities
 	return nil
 }
 
 func commit_transcript_record(ctx context.Context, record *TranscriptRecord) error {
+	//Get environment variables
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	if projectID == "" {
 		return fmt.Errorf("GOOGLE_CLOUD_PROJECT environment variable not set")

@@ -21,7 +21,6 @@ func TestProcessTranscript(t *testing.T) {
 	e.Bucket = os.Getenv("BUCKET_NAME")
 	e.Name = os.Getenv("TEST_FILE")
 	e.Metageneration = "1"
-
 	Process_transcript(context.Background(), e)
 }
 
@@ -47,34 +46,28 @@ func TestParseTranscript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
 	record := TranscriptRecord{}
 	result := speechpb.LongRunningRecognizeResponse{}
 	err = json.Unmarshal(jsonFile, &result)
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	err = parse_transcript(&result, &record)
 	if err != nil {
 		t.Errorf("parse_transcript: %v", err)
 	}
-
 	wants := []string{
 		"Thank you for calling",
 	}
-
 	for _, want := range wants {
 		if got := record.Transcript; !strings.Contains(got, want) {
 			t.Errorf("got %s, want %s", got, want)
 		}
 	}
-
 	wordCount := 455
 	if len(record.Words) != wordCount {
 		t.Errorf("got %d, want %d", len(record.Words), wordCount)
 	}
-
 	duration := 108.310
 	if record.Duration != duration {
 		t.Errorf("got %f, want %f", record.Duration, duration)
@@ -87,9 +80,21 @@ func TestAudioTranscription(t *testing.T) {
 	if err != nil {
 		t.Errorf("get_audio_transcript: %v", err)
 	}
-
 	if resp.Results[0].Alternatives[0].Transcript != "Hi, I'd like to buy a Chromecast. I'm always wondering whether you could help me with that." {
 		t.Errorf("got %s, want %s", resp.Results[0].Alternatives[0].Transcript, "Hello, how are you?")
+	}
+}
+
+func TestRedactTranscript(t *testing.T) {
+	ctx := context.Background()
+	record := TranscriptRecord{}
+	record.Transcript = "Hi my name is John Smith and my SSN is 123-45-6789. My home address is 555 Anystreet, Seattle WA 11010."
+	err := redact_transcript(ctx, &record) ; if err != nil {
+		t.Errorf("redact_transcript: %v", err)
+	}
+	wants := "Hi my name is ********** and my SSN is ***********. My home address is 555 Anystreet, ******* ** 11010."
+	if wants != record.Transcript {
+		t.Errorf("got %s, want %s", record.Transcript, wants)
 	}
 }
 

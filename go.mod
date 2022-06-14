@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	cloud.google.com/go/bigquery v1.8.0
+	cloud.google.com/go/dlp v1.4.0
 	cloud.google.com/go/language v1.2.0
 	cloud.google.com/go/logging v1.4.2
 	cloud.google.com/go/speech v1.4.0
