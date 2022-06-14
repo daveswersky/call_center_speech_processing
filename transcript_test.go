@@ -5,13 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"cloud.google.com/go/logging"
 
 	// [START imports]
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
@@ -31,7 +28,7 @@ func TestProcessTranscript(t *testing.T) {
 func TestGetFileMetadata(t *testing.T) {
 	ctx := context.Background()
 	record := TranscriptRecord{}
-	 err := get_file_metadata(ctx, os.Getenv("BUCKET_NAME"), os.Getenv("TEST_FILE"), &record)
+	err := get_file_metadata(ctx, os.Getenv("BUCKET_NAME"), os.Getenv("TEST_FILE"), &record)
 	if err != nil {
 		t.Errorf("get_callid_from_audiofile: %v", err)
 	}
@@ -45,23 +42,12 @@ func TestGetFileMetadata(t *testing.T) {
 	}
 }
 
-func getLogger() (*logging.Client, error) {
-	ctx := context.Background()
-	client, err := logging.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
-	if err != nil {
-		log.Fatalf("Failed to create client: %v", err)
-	}
-	return client, err
-}
-
 func TestParseTranscript(t *testing.T) {
 	jsonFile, err := ioutil.ReadFile("sample_transcript.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	logger, err := getLogger() ; if err != nil {
-		t.Fatal(err)
-	}
+	
 	record := TranscriptRecord{}
 	result := speechpb.LongRunningRecognizeResponse{}
 	err = json.Unmarshal(jsonFile, &result)
@@ -69,7 +55,7 @@ func TestParseTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = parse_transcript(&result, &record, logger)
+	err = parse_transcript(&result, &record)
 	if err != nil {
 		t.Errorf("parse_transcript: %v", err)
 	}
@@ -97,10 +83,7 @@ func TestParseTranscript(t *testing.T) {
 
 func TestAudioTranscription(t *testing.T) {
 	ctx := context.Background()
-	logger, err := getLogger() ; if err != nil {
-		t.Fatal(err)
-	}
-	err, resp := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", os.Getenv("BUCKET_NAME"), os.Getenv("TEST_FILE")), logger)
+	err, resp := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", os.Getenv("BUCKET_NAME"), os.Getenv("TEST_FILE")))
 	if err != nil {
 		t.Errorf("get_audio_transcript: %v", err)
 	}
@@ -112,15 +95,12 @@ func TestAudioTranscription(t *testing.T) {
 
 func TestGetSentiment(t *testing.T) {
 	record := TranscriptRecord{}
-	logger, err := getLogger() ; if err != nil {
-		t.Fatal(err)
-	}
 	record.Transcript = "I am happy"
 	record.Sentimentscore = 0.0
 	ctx := context.Background()
-	err = get_nlp_analysis(ctx, &record, logger)
+	err := get_nlp_analysis(ctx, &record)
 	if err != nil {
-		t.Errorf("get_sentiment_analysis: %v", err)
+		t.Errorf("Error in get_sentiment_analysis: %v", err)
 	}
 	fmt.Println(record.Sentimentscore)
 	if record.Sentimentscore != 0.900 {
@@ -131,9 +111,6 @@ func TestGetSentiment(t *testing.T) {
 func TestCommitBQ(t *testing.T) {
 	ctx := context.Background()
 	transcript := TranscriptRecord{}
-	logger, err := getLogger() ; if err != nil {
-		t.Fatal(err)
-	}
 	transcript.Date = time.Now()
 	transcript.Fileid = "test"
 	transcript.Transcript = "I am happy"
@@ -171,8 +148,8 @@ func TestCommitBQ(t *testing.T) {
 		Magnitude: 0.9,
 	})
 
-	err = commit_transcript_record(ctx, &transcript, logger)
+	err := commit_transcript_record(ctx, &transcript)
 	if err != nil {
-		t.Errorf("commit_bq: %v", err)
+		t.Errorf("Error in commit_bq: %v", err)
 	}
 }
