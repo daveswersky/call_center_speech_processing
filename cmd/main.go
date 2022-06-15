@@ -6,7 +6,7 @@ import (
 	"context"
 
 	// Blank-import the function package so the init() runs
-	spch "speech_analysis"
+	spch "example.com/speech_analysis"
 	"github.com/GoogleCloudPlatform/functions-framework-go/funcframework"
 )
 

@@ -1,2 +1,7 @@
 test.json
 .terraform
+function.zip
+*.tfplan
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
