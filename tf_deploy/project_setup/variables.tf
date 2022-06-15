@@ -19,11 +19,6 @@ variable "project_id" {
   description = "GCP project name"
 }
 
-variable "service_account_email" {
-  type        = string
-  description = "Service account email"
-}
-
 variable "audio_uploads_bucket" {
   type        = string
   description = "Audio uploads bucket name"
@@ -77,9 +72,8 @@ variable "service_ids" {
     default = ["speech.googleapis.com",
       "pubsub.googleapis.com",
       "artifactregistry.googleapis.com",
-      "cloudrunadmin.googleapis.com",
+      "run.googleapis.com",
       "eventarc.googleapis.com",
-      "build.googleapis.com",
       "cloudbuild.googleapis.com",
       "language.googleapis.com",
       "dlp.googleapis.com",
