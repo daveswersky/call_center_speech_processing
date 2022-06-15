@@ -117,6 +117,9 @@ type GCSEvent struct {
 //Triggered by Create/Finalize in the audio upload bucket
 func Process_transcript(ctx context.Context, e GCSEvent) error {
 	record := TranscriptRecord{}
+	err := confirm_env_vars() ; if err != nil {
+		log.Fatalf("Missing environment variables: %v", err)
+	}
 	logger, err := logging.NewClient(ctx, os.Getenv("GOOGLE_CLOUD_PROJECT"))
 	if err != nil {
 		log.Fatalf("Failed to create logging client: %v", err)
@@ -168,6 +171,22 @@ func writeEntry(client *logging.Client, info logging.Severity, msg string) {
 	defer logger.Flush()
 	log := logger.StandardLogger(info)
 	log.Printf(msg)
+}
+
+func confirm_env_vars() error {
+	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
+	if projectID == "" {
+		return fmt.Errorf("GOOGLE_CLOUD_PROJECT environment variable not set")
+	}
+	datasetID := os.Getenv("GOOGLE_DATASET_ID")
+	if datasetID == "" {
+		return fmt.Errorf("GOOGLE_DATASET_ID environment variable not set")
+	}
+	tableID := os.Getenv("GOOGLE_TABLE_ID")
+	if tableID == "" {
+		return fmt.Errorf("GOOGLE_TABLE_ID environment variable not set")
+	}
+	return nil
 }
 
 func get_file_metadata(ctx context.Context, bucket, filename string, record *TranscriptRecord) error {
@@ -369,10 +388,41 @@ func redact_transcript(ctx context.Context, record *TranscriptRecord) error {
 	}
 	record.Transcript = dlpResponse.GetItem().GetValue()
 	//Redact the individual sentences
-
+	for i, sentence := range record.Sentences {
+		req.Item = &dlppb.ContentItem{
+			DataItem: &dlppb.ContentItem_Value{
+				Value: sentence.Sentence,
+			},
+		}
+		dlpResponse, err = client.DeidentifyContent(ctx, req) ; if err != nil {
+			return err
+		}
+		record.Sentences[i].Sentence = dlpResponse.GetItem().GetValue()
+	}
 	//Redact the individual words
-
+	for i, word := range record.Words {
+		req.Item = &dlppb.ContentItem{
+			DataItem: &dlppb.ContentItem_Value{
+				Value: word.Word,
+			},
+		}
+		dlpResponse, err = client.DeidentifyContent(ctx, req) ; if err != nil {
+			return err
+		}
+	    record.Words[i].Word = dlpResponse.GetItem().GetValue()
+	}
 	//Redact the individual entities
+	for i, entity := range record.Entities {
+		req.Item = &dlppb.ContentItem{
+			DataItem: &dlppb.ContentItem_Value{
+				Value: entity.Name,
+			},
+		}
+		dlpResponse, err = client.DeidentifyContent(ctx, req) ; if err != nil {
+			return err
+		}
+		record.Entities[i].Name = dlpResponse.GetItem().GetValue()
+	}
 	return nil
 }
 

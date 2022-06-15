@@ -21,7 +21,16 @@ func TestProcessTranscript(t *testing.T) {
 	e.Bucket = os.Getenv("BUCKET_NAME")
 	e.Name = os.Getenv("TEST_FILE")
 	e.Metageneration = "1"
-	Process_transcript(context.Background(), e)
+	err := Process_transcript(context.Background(), e) ; if err != nil {
+		t.Errorf("Process_transcript: %v", err)
+	}
+}
+
+func TestConfirmEnvVar(t *testing.T) {
+	os.Setenv("GOOGLE_CLOUD_PROJECT", "")
+	err := confirm_env_vars() ; if err == nil {
+		t.Errorf("confirm_env_vars: %v", "expected error")
+	}
 }
 
 func TestGetFileMetadata(t *testing.T) {
