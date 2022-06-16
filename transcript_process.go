@@ -213,7 +213,7 @@ func get_audio_transcript(ctx context.Context, gcsUri string) (error, *speechpb.
 	}
 	req :=  &speechpb.LongRunningRecognizeRequest{
 		Config: &speechpb.RecognitionConfig{
-			SampleRateHertz:                     44100,
+			SampleRateHertz:                     8000,
 			LanguageCode:                        "en-US",
 			Encoding:                            speechpb.RecognitionConfig_LINEAR16,
 			AudioChannelCount:                   2,
