@@ -46,16 +46,6 @@ resource "google_service_account" "service_account" {
   display_name = "Project Service Account"
 }
 
-# Cloud Pub/Sub needs the role 
-# roles/iam.serviceAccountTokenCreator granted to service 
-# account service-859454537485@gcp-sa-pubsub.iam.gserviceaccount.com on this project to create identity tokens. You can change this later.
-
-# This trigger needs the role 
-# roles/pubsub.publisher granted to service 
-# account service-859454537485@gs-project-accounts.iam.gserviceaccount.com 
-# to receive events via Cloud Storage.
-
-
 resource "google_project_iam_member" "log-binding" {
   project = var.project_id
   role = "roles/logging.logWriter"

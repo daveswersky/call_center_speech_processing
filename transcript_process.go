@@ -137,29 +137,29 @@ func Process_transcript(ctx context.Context, e GCSEvent) error {
 	//Submit audio file to Google Speech API
 	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name))
 	if err != nil {
-		writeEntry(logger, logging.Critical, fmt.Sprintf("Failed to get transcript from audio file: %v", err))
+		writeEntry(logger, logging.Critical, fmt.Sprintf("CALLID: %s | Failed to get transcript from audio file: %v", record.Callid, err))
 		return err
 	}
 	//Build the transcript record
 	err = parse_transcript(result, &record) ; if err != nil {
-		writeEntry(logger, logging.Critical, fmt.Sprintf("Failed to parse transcript from audio file: %v", err))
+		writeEntry(logger, logging.Critical, fmt.Sprintf("CALLID: %s | Failed to parse transcript from audio file: %v", record.Callid, err))
 		return err
 	}
 	//Use DLP to redact sensitive data
 	if record.Dlp == "true" {
 		err = redact_transcript(ctx, &record) ; if err != nil {
-			writeEntry(logger, logging.Critical, fmt.Sprintf("Failed to get DLP analysis from audio file: %v", err))
+			writeEntry(logger, logging.Critical, fmt.Sprintf("CALLID: %s | Failed to get DLP analysis from audio file: %v", record.Callid, err))
 			return err
 		}
 	}
 	//Get the sentiment analysis
 	err = get_nlp_analysis(ctx, &record) ; if err != nil {
-		writeEntry(logger, logging.Critical, fmt.Sprintf("Failed to get sentiment analysis from audio file: %v", err))
+		writeEntry(logger, logging.Critical, fmt.Sprintf("CALLID: %s | Failed to get sentiment analysis from audio file: %v", record.Callid, err))
 		return err
 	}
 	//Commit BQ record
 	err = commit_transcript_record(ctx, &record) ; if err != nil {
-		writeEntry(logger, logging.Critical, fmt.Sprintf("Failed to commit transcript record to BigQuery: %v", err))
+		writeEntry(logger, logging.Critical, fmt.Sprintf("CALLID: %s | Failed to commit transcript record to BigQuery: %v", record.Callid, err))
 		return err
 	}
 	writeEntry(logger, logging.Info, "Completed processing transcript for callid: "+record.Callid)
