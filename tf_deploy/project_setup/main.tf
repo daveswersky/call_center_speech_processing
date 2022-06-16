@@ -58,6 +58,12 @@ resource "google_project_iam_member" "functions-binding" {
   member  = "serviceAccount:${google_service_account.service_account.email}"
 }
 
+resource "google_project_iam_member" "run-binding" {
+  project = var.project_id
+  role = "roles/run.invoker"
+  member  = "serviceAccount:${google_service_account.service_account.email}"
+}
+
 resource "google_project_iam_member" "bigquery-binding" {
   project = var.project_id
   role    = "roles/bigquery.dataEditor"
