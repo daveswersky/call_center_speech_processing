@@ -1,24 +1,29 @@
 package function
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
-	"time"
-	"os"
+	"io/ioutil"
 	"log"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/kjk/betterguid"
 
 	// [START imports]
 	"cloud.google.com/go/bigquery"
+	dlp "cloud.google.com/go/dlp/apiv2"
 	language "cloud.google.com/go/language/apiv1"
+	"cloud.google.com/go/logging"
 	speech "cloud.google.com/go/speech/apiv1"
+	"cloud.google.com/go/storage"
 	languagepb "google.golang.org/genproto/googleapis/cloud/language/v1"
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
-	"google.golang.org/protobuf/types/known/durationpb"
-	"cloud.google.com/go/storage"
-	"cloud.google.com/go/logging"
-	dlp "cloud.google.com/go/dlp/apiv2"
 	dlppb "google.golang.org/genproto/googleapis/privacy/dlp/v2"
+	"google.golang.org/protobuf/types/known/durationpb"
 	// [END imports]
 )
 
@@ -129,10 +134,13 @@ func Process_transcript(ctx context.Context, e GCSEvent) error {
 	if err != nil { 
 		log.Fatalf("Failed to get metadata from audio file: %v", err) 
 	}
+
+
 	file := e
 	record.Date = time.Now()
 	record.Fileid = betterguid.New()
 	record.Filename = fmt.Sprintf("%s/%s", file.Bucket, file.Name)
+
 	writeEntry(logger, logging.Info, "Processing audio for callid: "+record.Callid)
 	//Submit audio file to Google Speech API
 	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name))
@@ -189,6 +197,39 @@ func confirm_env_vars() error {
 	return nil
 }
 
+func get_audio_samplerate(ctx context.Context, bucket, file string) (int32, error) {
+	client, err := storage.NewClient(ctx) ; if err != nil {
+		return 0, err
+	}
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(ctx, time.Second*50)
+	defer cancel()
+	rc, err := client.Bucket(bucket).Object(file).NewRangeReader(ctx, 0, 44)
+	if err != nil {
+		return 0, err
+	}
+	defer rc.Close()
+	header, err := ioutil.ReadAll(rc) ; if err != nil {
+		return 0, err
+	}
+	sampleRate := bits32ToInt(header[24:28])
+	return sampleRate, nil
+}
+
+// turn a 32-bit byte array into an int
+func bits32ToInt(b []byte) int32 {
+	if len(b) != 4 {
+		panic("Expected size 4!")
+	}
+	var payload uint32
+	buf := bytes.NewReader(b)
+	err := binary.Read(buf, binary.LittleEndian, &payload)
+	if err != nil {
+		panic(err)
+	}
+	return int32(payload) // easier to work with ints
+}
+
 func get_file_metadata(ctx context.Context, bucket, filename string, record *TranscriptRecord) error {
 	//Get the metadata from the audio file
 	client, err := storage.NewClient(ctx)
@@ -208,12 +249,16 @@ func get_file_metadata(ctx context.Context, bucket, filename string, record *Tra
 
 func get_audio_transcript(ctx context.Context, gcsUri string) (error, *speechpb.LongRunningRecognizeResponse) {
 	client, err := speech.NewClient(ctx)
+	file := strings.Split(gcsUri, "/")
+	bucketName := file[2]
+	fileName := file[3]
+	sampleRate, err := get_audio_samplerate(ctx, bucketName, fileName) ; 
 	if err != nil {
 		return err, nil
 	}
 	req :=  &speechpb.LongRunningRecognizeRequest{
 		Config: &speechpb.RecognitionConfig{
-			SampleRateHertz:                     8000,
+			SampleRateHertz:                     sampleRate,
 			LanguageCode:                        "en-US",
 			Encoding:                            speechpb.RecognitionConfig_LINEAR16,
 			AudioChannelCount:                   2,

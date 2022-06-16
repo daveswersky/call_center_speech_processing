@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+
 	// [START imports]
 	speechpb "google.golang.org/genproto/googleapis/cloud/speech/v1"
 	// [END imports]
@@ -25,6 +26,21 @@ func TestProcessTranscript(t *testing.T) {
 		t.Errorf("Process_transcript: %v", err)
 	}
 }
+
+func TestGetWavHeader(t *testing.T) {
+	ctx := context.Background()
+	bucket := os.Getenv("BUCKET_NAME")
+	object := os.Getenv("TEST_FILE")
+		
+	sampleRate, err := get_audio_samplerate(ctx, bucket, object) ; if err != nil {
+		t.Errorf("get_audio_samplerate: %v", err)
+	}
+	wantRate :=  int32(44100)
+	if sampleRate != wantRate {
+		t.Errorf("got %d, want %d", sampleRate, wantRate)
+	}
+}
+
 
 func TestConfirmEnvVar(t *testing.T) {
 	os.Setenv("GOOGLE_CLOUD_PROJECT", "")

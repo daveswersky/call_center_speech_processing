@@ -1,10 +1,10 @@
 {
     "go.formatTool": "gofmt",
     "go.testEnvVars":{
-        "BUCKET_NAME": "safv2_audio_upload",
-        "TEST_FILE" : "sample_order.wav",
-        "GOOGLE_CLOUD_PROJECT": "saf-v2",
-        "GOOGLE_DATASET_ID" : "saf",
-        "GOOGLE_TABLE_ID" : "transcripts"
+        "BUCKET_NAME": "audio-upload-160b0597c458186b",
+        "TEST_FILE" : "commercial_stereo.wav",
+        "GOOGLE_CLOUD_PROJECT": "callcenteraudio-2",
+        "GOOGLE_DATASET_ID": "call_transcripts",
+        "GOOGLE_TABLE_ID": "transcripts",
     }
 }
