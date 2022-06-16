@@ -134,13 +134,10 @@ func Process_transcript(ctx context.Context, e GCSEvent) error {
 	if err != nil { 
 		log.Fatalf("Failed to get metadata from audio file: %v", err) 
 	}
-
-
 	file := e
 	record.Date = time.Now()
 	record.Fileid = betterguid.New()
 	record.Filename = fmt.Sprintf("%s/%s", file.Bucket, file.Name)
-
 	writeEntry(logger, logging.Info, "Processing audio for callid: "+record.Callid)
 	//Submit audio file to Google Speech API
 	err, result := get_audio_transcript(ctx, fmt.Sprintf("gs://%s/%s", file.Bucket, file.Name))
