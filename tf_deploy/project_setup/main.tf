@@ -46,7 +46,6 @@ resource "google_service_account" "service_account" {
   display_name = "Project Service Account"
 }
 
-
 resource "google_project_iam_member" "log-binding" {
   project = var.project_id
   role = "roles/logging.logWriter"
