@@ -46,6 +46,7 @@ resource "google_service_account" "service_account" {
   display_name = "Project Service Account"
 }
 
+
 resource "google_project_iam_member" "log-binding" {
   project = var.project_id
   role = "roles/logging.logWriter"
@@ -79,6 +80,4 @@ resource "google_project_iam_member" "dlp-binding" {
   role    = "roles/dlp.user"
   member  = "serviceAccount:${google_service_account.service_account.email}"
 }
-# This trigger needs the role roles/eventarc.eventReceiver granted to service account
-# saf-v2@appspot.gserviceaccount.com to receive events via Cloud Audit Logs.
 
