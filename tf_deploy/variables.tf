@@ -45,7 +45,7 @@ variable "table_id" {
 variable "function_name" {
   type        = string
   description = "Cloud Function Name"
-  default     = "call_audio_transcription"
+  default     = "call-audio-transcription"
 }
 
 variable "function_description" {

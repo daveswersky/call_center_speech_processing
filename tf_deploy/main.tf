@@ -284,3 +284,19 @@ resource "google_storage_bucket_iam_member" "audio_member" {
 #     null_resource.zipfile,
 #   ]
 # }
+output "audio_uploads_bucket" {
+  value = google_storage_bucket.audio_uploads_bucket.name
+}
+
+
+
+#  gcloud functions deploy call-audio-transcription --region=us-central1 --gen2 --memory=256 \
+#   --trigger-resource=[AUDIO-BUCKET] \
+#   --trigger-event=google.storage.object.finalize --entry-point=Process_transcript --runtime=go116 \
+#   --service-account=[SERVICEACCOUNT] --source=gs://[FUNCTION-BUCKET]/function.zip --timeout=540 \
+#   --set-env-vars="GOOGLE_CLOUD_PROJECT=callaudio" \
+#   --set-env-vars="GOOGLE_DATASET_ID=call_transcripts" \
+#   --set-env-vars="GOOGLE_TABLE_ID=transcripts" \
+#   --min-instances=5 --max-instances=5 --trigger-service-account=[SERVICEACCOUNT]
+
+# zip -r -X function.zip go.mod go.sum transcript_process.go
