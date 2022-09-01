@@ -2,6 +2,7 @@
 
 This repository contains a solution designed to process call center audio files. WAV-formatted audio is uploaded to a GCS bucket, then the solution will:
 
+
 * Transcribe the audio
 * Perform Sentiment analysis on the text, words, and each sentence
 * Optionally redact PII from the transcribed text
